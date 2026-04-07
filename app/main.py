@@ -14,7 +14,7 @@ from app.services.document_detector import DocumentDetector
 from app.services.image_preprocessor import ImagePreprocessor
 from app.services.ocr_client import OCRClient
 from app.services.data_extractor import DataExtractor
-from app.utils.helpers import generate_unique_filename, ensure_dir_exists
+from app.utils.helpers import get_safe_original_filename, ensure_dir_exists
 
 import logging
 
@@ -132,8 +132,8 @@ async def preprocess_invoice(file: UploadFile = File(...)):
             use_segmenter=False,  # Already detected/cropped
         )
 
-        # Save processed image (optional, for debugging)
-        filename = generate_unique_filename("preprocessed.jpg")
+        # Save processed image using the original upload name.
+        filename = get_safe_original_filename(file.filename)
         filepath = os.path.join(UPLOAD_DIR, filename)
 
         # Convert RGB to BGR for OpenCV saving
