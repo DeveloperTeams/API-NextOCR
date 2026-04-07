@@ -21,7 +21,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="YOLOv10 Invoice Preprocessing Pipeline", version="1.0.0")
+app = FastAPI(title="E-Invoice Engine", version="1.0.0")
 
 # CORS middleware
 app.add_middleware(
