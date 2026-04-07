@@ -5,7 +5,7 @@ from app.models.schemas import InvoiceData, LineItem, PaymentInfo
 
 class DataExtractor:
     """Extract structured data from OCR text"""
-    
+
     # Regex patterns
     PATTERNS = {
         "phone": r"\b(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b",
@@ -20,11 +20,11 @@ class DataExtractor:
         "payment_method": r"(?:payment|paid\s*by|method)[:\s]*(cash|credit|debit|card|visa|mastercard|amex|check|cheque|bank\s*transfer)",
         "riel": r"(៛\s*\d{1,3}(?:,\d{3})*)",
     }
-    
+
     def extract(self, text: str) -> InvoiceData:
         """Extract structured data from OCR text"""
         lines = text.split("\n")
-        
+
         # Initialize data
         merchant_name = None
         merchant_address = None
@@ -34,63 +34,76 @@ class DataExtractor:
         invoice_time = None
         items: List[LineItem] = []
         payment = PaymentInfo()
-        
+
         # Extract phone numbers
         phones = re.findall(self.PATTERNS["phone"], text)
         if phones:
             merchant_phone = phones[0]
-        
+
         # Extract dates
         dates = re.findall(self.PATTERNS["date"], text)
         if dates:
             invoice_date = dates[0]
-        
+
         # Extract times
         times = re.findall(self.PATTERNS["time"], text)
         if times:
             invoice_time = times[0]
-        
+
         # Extract invoice number
         inv_match = re.search(self.PATTERNS["invoice_number"], text, re.IGNORECASE)
         if inv_match:
             invoice_number = inv_match.group(1).strip()
-        
+
         # Extract amounts
         subtotal_match = re.search(self.PATTERNS["subtotal"], text, re.IGNORECASE)
         if subtotal_match:
             payment.subtotal = self._parse_amount(subtotal_match.group(1))
-        
+
         tax_match = re.search(self.PATTERNS["tax"], text, re.IGNORECASE)
         if tax_match:
             payment.tax = self._parse_amount(tax_match.group(1))
-        
+
         total_match = re.search(self.PATTERNS["total"], text, re.IGNORECASE)
         if total_match:
             payment.total = self._parse_amount(total_match.group(1))
-        
+
         # Extract payment method
         payment_match = re.search(self.PATTERNS["payment_method"], text, re.IGNORECASE)
         if payment_match:
             payment.method = payment_match.group(1).title()
-        
+
         # Extract line items (heuristic approach)
         items = self._extract_line_items(lines)
-        
+
         # Extract merchant name (first non-empty line that's not a number/date)
         for line in lines:
             line = line.strip()
             if line and not self._is_numeric_line(line) and len(line) > 2:
                 merchant_name = line
                 break
-        
+
         # Extract merchant address (lines containing street indicators)
-        street_indicators = ["street", "st", "avenue", "ave", "boulevard", "blvd", "road", "rd", "drive", "dr", "lane", "ln"]
+        street_indicators = [
+            "street",
+            "st",
+            "avenue",
+            "ave",
+            "boulevard",
+            "blvd",
+            "road",
+            "rd",
+            "drive",
+            "dr",
+            "lane",
+            "ln",
+        ]
         for line in lines:
             line_lower = line.lower()
             if any(ind in line_lower for ind in street_indicators):
                 merchant_address = line.strip()
                 break
-        
+
         return InvoiceData(
             merchant_name=merchant_name,
             merchant_address=merchant_address,
@@ -99,9 +112,11 @@ class DataExtractor:
             invoice_date=invoice_date,
             invoice_time=invoice_time,
             items=items,
-            payment=payment if payment.subtotal or payment.tax or payment.total else None,
+            payment=payment
+            if payment.subtotal or payment.tax or payment.total
+            else None,
             dynamic_fields=self._extract_dynamic_fields(lines, text),
-            raw_text=text
+            raw_text=text,
         )
 
     def _extract_dynamic_fields(self, lines: List[str], text: str) -> Dict[str, Any]:
@@ -172,7 +187,7 @@ class DataExtractor:
             add_field("tax", tax_match.group(1))
 
         return fields
-    
+
     def _parse_amount(self, amount_str: str) -> float:
         """Parse amount string to float"""
         # Remove currency symbols and commas
@@ -181,38 +196,41 @@ class DataExtractor:
             return float(cleaned)
         except ValueError:
             return 0.0
-    
+
     def _is_numeric_line(self, line: str) -> bool:
         """Check if line is primarily numeric"""
         digits = sum(c.isdigit() for c in line)
         return digits > len(line) * 0.5
-    
+
     def _extract_line_items(self, lines: List[str]) -> List[LineItem]:
         """Extract line items from text lines"""
         items = []
-        
+
         # Look for lines that look like line items
         # Pattern: description followed by price
         item_pattern = r"^(.+?)\s+(\$?\s*\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*$"
-        
+
         for line in lines:
             line = line.strip()
             if not line:
                 continue
-            
+
             # Skip header-like lines
-            if any(word in line.lower() for word in ["subtotal", "total", "tax", "invoice", "date", "payment"]):
+            if any(
+                word in line.lower()
+                for word in ["subtotal", "total", "tax", "invoice", "date", "payment"]
+            ):
                 continue
-            
+
             # Try to match item pattern
             match = re.match(item_pattern, line)
             if match:
                 name = match.group(1).strip()
                 price = self._parse_amount(match.group(2))
-                
+
                 # Skip if name is too short or looks like a number
                 if len(name) > 2 and not name.isdigit():
-                    items.append(LineItem(name=name, price=price))
-        
+                    items.append(LineItem.create(name=name, price=price))
+
         # Limit to reasonable number of items
         return items[:20]

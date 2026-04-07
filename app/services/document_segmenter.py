@@ -19,7 +19,7 @@ class DocumentSegmenter:
     """
     
     MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx"
-    INPUT_SIZE = 320  # Fallback size when model input shape is dynamic/unknown
+    INPUT_SIZE = 320  
     MIN_MODEL_SIZE_BYTES = 10 * 1024 * 1024
     
     def __init__(self, model_path: Optional[str] = None):
@@ -30,7 +30,6 @@ class DocumentSegmenter:
         self._load_model()
     
     def _get_default_model_path(self) -> str:
-        """Get default model path, download if missing"""
         model_dir = os.path.join(os.path.dirname(__file__), "..", "models")
         os.makedirs(model_dir, exist_ok=True)
         path = os.path.join(model_dir, "u2net.onnx")
@@ -42,7 +41,6 @@ class DocumentSegmenter:
         return path
 
     def _download_model(self, target_path: str) -> None:
-        """Download model atomically to avoid partially-written files."""
         tmp_path = f"{target_path}.tmp"
         try:
             if os.path.exists(tmp_path):
@@ -64,7 +62,6 @@ class DocumentSegmenter:
                 os.remove(tmp_path)
     
     def _load_model(self) -> None:
-        """Load ONNX model with CPU provider (add CUDA for GPU)"""
         providers = ["CPUExecutionProvider"]
         available = ort.get_available_providers()
         use_cuda = os.getenv("ONNXRUNTIME_USE_CUDA", "0").strip().lower() in {"1", "true", "yes"}
@@ -107,7 +104,6 @@ class DocumentSegmenter:
         Falls back to INPUT_SIZE when shape is dynamic or unavailable.
         """
         try:
-            # Typical NCHW: [batch, channels, height, width]
             if len(input_shape) >= 4:
                 h = input_shape[2]
                 w = input_shape[3]
@@ -440,7 +436,6 @@ class DocumentSegmenter:
                 confidence -= 0.2
                 break
 
-        # Factor 3: Aspect ratio preference (documents are usually rectangular)
         width_top = np.sqrt((corners[1][0] - corners[0][0]) ** 2 + (corners[1][1] - corners[0][1]) ** 2)
         width_bottom = np.sqrt((corners[2][0] - corners[3][0]) ** 2 + (corners[2][1] - corners[3][1]) ** 2)
         height_left = np.sqrt((corners[3][0] - corners[0][0]) ** 2 + (corners[3][1] - corners[0][1]) ** 2)

@@ -39,9 +39,6 @@ class ImagePreprocessor:
             except Exception as e:
                 logger.warning(f"Failed to initialize DocumentSegmenter: {e}")
 
-    # -------------------------------
-    # QUALITY ASSESSMENT
-    # -------------------------------
     def assess_quality(self, image: np.ndarray) -> Dict[str, float]:
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
@@ -134,9 +131,6 @@ class ImagePreprocessor:
         except:
             return image
 
-    # -------------------------------
-    # ENHANCEMENT
-    # -------------------------------
     def enhance_contrast(self, image, lang="en"):
         clip = 2.0 if lang == "km" else 3.0
 
@@ -154,9 +148,6 @@ class ImagePreprocessor:
 
         return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 21)
 
-    # -------------------------------
-    # DOCUMENT DETECTION & CROPPING
-    # -------------------------------
     def detect_and_crop_document(
         self,
         image: np.ndarray,
@@ -268,9 +259,6 @@ class ImagePreprocessor:
 
         return warped
 
-    # -------------------------------
-    # DESKEW (NEW)
-    # -------------------------------
     def deskew(self, image):
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
@@ -299,9 +287,6 @@ class ImagePreprocessor:
 
         return rotated, angle
 
-    # -------------------------------
-    # MAIN PIPELINE
-    # -------------------------------
     def preprocess_adaptive(
         self,
         image: np.ndarray,

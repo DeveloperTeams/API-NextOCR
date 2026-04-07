@@ -93,11 +93,10 @@ api/
 			document_segmenter.py    # U2-Net segmentation support
 			image_preprocessor.py    # Adaptive preprocessing pipeline
 			ocr_client.py            # OCR provider routing + retries + cache
-			ocr_service.py           # Unified OCR pipeline orchestration
 			data_extractor.py        # OCR text -> structured invoice fields
+		utils/
+			helpers.py               # Utility functions (filename generation)
 		uploads/                   # Saved preview/processed images
-	main.py                      # Minimal local entry script
-	requirements.txt
 	pyproject.toml
 ```
 
@@ -252,9 +251,15 @@ Response fields:
 
 ---
 
-### POST /api/detect-corners
+### POST /api/preprocess
 
-Detects document corners from an uploaded image.
+Single endpoint for invoice preprocessing pipeline:
+1. Detect invoice using YOLOv10 (primary) with fallback to U2-Net/OpenCV
+2. Crop invoice tightly around document boundaries
+3. Return cropped image optimized for NextOCR
+
+Input: Raw invoice image (JPEG/PNG)
+Output: Cropped invoice image (JPEG)
 
 **Request:**
 
@@ -263,184 +268,42 @@ Detects document corners from an uploaded image.
 
 **Response highlights:**
 
-- `corners`: 4 corner points `[{"x", "y"}, ...]`
-- `method`: `yolo` | `unet` | `opencv` | `fallback`
-- `bounding_box`: `{x, y, width, height}`
-- `preview_url`: URL to preview image
+- `success`: boolean indicating success
+- `cropped_image_url`: URL to the preprocessed image
+- `detection_method`: `yolo` | `unet` | `opencv` | `fallback`
+- `image_width`: width of processed image in pixels
+- `image_height`: height of processed image in pixels
+- `message`: status message
 
 **Examples:**
 
 cURL:
 
 ```bash
-curl -X POST "http://localhost:8000/api/detect-corners" \
-  -F "file=@sample-receipt.jpg"
+curl -X POST "http://localhost:8000/api/preprocess" \
+  -F "file=@sample-invoice.jpg"
 ```
 
 Python:
 
 ```python
 import requests
-with open("sample-receipt.jpg", "rb") as f:
+
+with open("sample-invoice.jpg", "rb") as f:
     files = {"file": f}
-    response = requests.post("http://localhost:8000/api/detect-corners", files=files)
+    response = requests.post("http://localhost:8000/api/preprocess", files=files)
     print(response.json())
 ```
 
----
-
-### POST /api/apply-crop
-
-Applies perspective crop using user-provided corners.
-
-Request:
-
-- multipart/form-data
-- file: image file
-- corners: JSON string array, example:
-  [{"x":10,"y":10},{"x":500,"y":20},{"x":490,"y":900},{"x":5,"y":890}]
-
-Response:
-
-- cropped_image_url
-- width
-- height
-
----
-
-### POST /api/process
-
-Classic full OCR pipeline endpoint.
-
-**Behavior:**
-
-- If `corners` are provided, manual crop is used.
-- If `corners` are not provided, auto-detection attempts: YOLO → U2-Net → OpenCV.
-- Runs multiple OCR attempts and selects best text by quality score.
-- Returns structured invoice data and OCR diagnostics.
-
-**Request:**
-
-- multipart/form-data
-- `file`: image file (required)
-- `corners`: optional JSON string array
-
-**Examples:**
-
-cURL:
-
-```bash
-curl -X POST "http://localhost:8000/api/process" \
-  -F "file=@sample-receipt.jpg"
-```
-
 Python:
 
 ```python
 import requests
-import json
 
-with open("sample-receipt.jpg", "rb") as f:
+with open("sample-invoice.jpg", "rb") as f:
     files = {"file": f}
-    data = {"corners": json.dumps([{"x":0,"y":0},{"x":500,"y":0},{"x":500,"y":800},{"x":0,"y":800}])}
-    response = requests.post("http://localhost:8000/api/process", files=files, data=data)
-    result = response.json()
-    print(f"Merchant: {result['data']['merchant_name']}")
-    print(f"Total: {result['data']['payment']['total']}")
-```
-
-Success response (shape):
-
-```json
-{
-  "success": true,
-  "data": {
-    "merchant_name": "45 COFFEE",
-    "merchant_address": "#32 St. 432 ...",
-    "merchant_phone": "012 589 469",
-    "invoice_number": "C26-11756",
-    "invoice_date": "22-03-2026",
-    "invoice_time": "10:54",
-    "items": [
-      {
-        "name": "Iced Latte",
-        "quantity": 1,
-        "price": 2.43,
-        "total": 2.43
-      }
-    ],
-    "payment": {
-      "subtotal": 2.43,
-      "tax": 0,
-      "total": 2.43,
-      "method": "Cash"
-    },
-    "dynamic_fields": {},
-    "raw_text": "..."
-  },
-  "cropped_image_url": "/api/uploads/processed_xxx.jpg",
-  "detection_method": "unet",
-  "detected_corners": [{ "x": 0, "y": 0 }],
-  "bounding_box": { "x": 0, "y": 0, "width": 100, "height": 200 },
-  "best_ocr_attempt": "nextocr_enhanced",
-  "ocr_errors": [],
-  "message": "Processing completed successfully"
-}
-```
-
-**Failure response (HTTP 502):**
-
-```json
-{
-  "detail": {
-    "message": "OCR failed for all attempts",
-    "errors": [
-      "nextocr_enhanced: Empty OCR response",
-      "auto_enhanced: Network timeout"
-    ]
-  }
-}
-```
-
----
-
-### POST /api/ocr-unified
-
-Enhanced unified OCR endpoint with richer metadata and multi-pass support.
-
-**Parameters:**
-
-- `file`: UploadFile (required)
-- `lang`: `en` | `km` (default `en`)
-- `auto_crop`: `true`/`false` (default `true`)
-- `multi_pass`: `true`/`false` (default `true`)
-- `return_structured`: `true`/`false` (default `false`)
-
-**Example:**
-
-```bash
-curl -X POST "http://localhost:8000/api/ocr-unified?lang=km&auto_crop=true&multi_pass=true" \
-  -F "file=@sample-receipt.jpg"
-```
-
-**Response includes:**
-
-- Best OCR attempt with confidence and latency
-- All OCR attempts (pipeline stages and fallbacks)
-- Detection stage metadata (method, cropped dimensions)
-- Extraction stage metadata (merchant detected, item count, total)
-- Processed image URL
-
----
-
-### POST /api/ocr/clear-cache
-
-Clears in-memory OCR cache.
-
-Example:
-
-```bash
-curl -X POST "http://localhost:8000/api/ocr/clear-cache"
+    response = requests.post("http://localhost:8000/api/preprocess", files=files)
+    print(response.json())
 ```
 
 ---
