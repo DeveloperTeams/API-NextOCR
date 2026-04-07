@@ -1,1 +1,0 @@
-# Invoice OCR Extractor API
