@@ -10,13 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentSegmenter:
-    """
-    Document segmentation using U²-Net ONNX model.
-    Returns precise quadrilateral corners for perspective transform.
-    
-    Model source: https://github.com/xuebinqin/U-2-Net
-    Pre-converted ONNX: https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx
-    """
     
     MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx"
     INPUT_SIZE = 320  
