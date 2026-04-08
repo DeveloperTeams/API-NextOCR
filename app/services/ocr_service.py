@@ -241,39 +241,39 @@ class UnifiedOCRService:
         """Generate preprocessing strategies based on image characteristics"""
         strategies = []
         h, w = image.shape[:2]
-        
+
         # Strategy 1: Light enhancement (fast, good for clear images)
         strategies.append((
             "light_en",
             {"for_nextocr": True, "lang": "en", "auto_crop": False}
         ))
-        
+
         # Strategy 2: Khmer-optimized (for Khmer text)
         if lang == "km":
             strategies.append((
                 "khmer_enhanced",
                 {"for_nextocr": True, "lang": "km", "auto_crop": False}
             ))
-        
+
         # Strategy 3: Heavy enhancement (for low quality)
         strategies.append((
             "heavy_enhanced",
             {"for_nextocr": True, "lang": lang, "auto_crop": False}
         ))
-        
+
         # Strategy 4: No enhancement (original)
         strategies.append((
             "original",
             {"for_nextocr": False, "lang": lang, "auto_crop": False}
         ))
-        
+
         # Strategy 5: Super-resolution for small images
         if w < 1000:
             strategies.append((
                 "superres",
                 {"for_nextocr": True, "lang": lang, "auto_crop": False}
             ))
-        
+
         return strategies
 
     def _multi_pass_ocr(

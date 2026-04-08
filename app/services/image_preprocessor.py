@@ -156,7 +156,7 @@ class ImagePreprocessor:
         """
         Detect document boundaries and crop to the document only.
         Tries U²-Net segmentation first (if available), falls back to contour detection.
-        
+
         Returns: (cropped_image, success_flag)
         """
         # Try U²-Net segmentation first (more accurate)
@@ -260,24 +260,44 @@ class ImagePreprocessor:
         return warped
 
     def deskew(self, image):
+        """
+        Detect and correct text skew using projection profile analysis.
+        More reliable than minAreaRect for documents with white backgrounds.
+        """
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
-        coords = np.column_stack(np.where(gray > 0))
-        if len(coords) < 100:
+        # Invert: text should be white on black for analysis
+        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+        text_pixels = cv2.countNonZero(binary)
+        if text_pixels < 100:
             return image, 0.0
 
-        angle = cv2.minAreaRect(coords)[-1]
+        best_angle = 0.0
+        best_score = -1
 
-        if angle < -45:
-            angle = -(90 + angle)
-        else:
-            angle = -angle
+        for angle in np.arange(-5.0, 5.5, 0.5):
+            h, w = gray.shape
+            M = cv2.getRotationMatrix2D((w // 2, h // 2), angle, 1)
+            rotated = cv2.warpAffine(
+                binary, M, (w, h),
+                flags=cv2.INTER_NEAREST,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=0
+            )
 
-        if abs(angle) < 0.5:
+            projection = np.sum(rotated, axis=1)
+            score = np.var(projection)
+
+            if score > best_score:
+                best_score = score
+                best_angle = angle
+
+        if abs(best_angle) < 0.5:
             return image, 0.0
 
         h, w = image.shape[:2]
-        M = cv2.getRotationMatrix2D((w // 2, h // 2), angle, 1)
+        M = cv2.getRotationMatrix2D((w // 2, h // 2), best_angle, 1)
 
         rotated = cv2.warpAffine(
             image, M, (w, h),
@@ -285,7 +305,7 @@ class ImagePreprocessor:
             borderMode=cv2.BORDER_REPLICATE
         )
 
-        return rotated, angle
+        return rotated, best_angle
 
     def preprocess_adaptive(
         self,
@@ -297,14 +317,14 @@ class ImagePreprocessor:
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Full adaptive preprocessing pipeline for OCR.
-        
+
         Args:
             image: Input image (RGB/BGR)
             for_nextocr: Apply super-resolution for low-res images
             lang: Language code ("en", "km", etc.) - affects enhancement
             auto_crop: Auto-detect and crop document boundaries
             use_segmenter: Use U²-Net segmentation (more accurate, slower)
-        
+
         Returns:
             (processed_image, metadata) with metrics and confidence
         """
