@@ -15,3 +15,7 @@ uploads/
 # Models Pretrained
 EDSR_x2.pb
 u2net.onnx
+models--juliozhao--DocLayout-YOLO-DocStructBench/
+# Ignore large YOLO model artifacts
+app/models/models--juliozhao--DocLayout-YOLO-DocStructBench/
+*.pt
