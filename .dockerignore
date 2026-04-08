@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.env
+uploads/
+.vscode/
+.ruff_cache/
