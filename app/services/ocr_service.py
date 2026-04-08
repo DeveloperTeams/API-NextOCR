@@ -1,8 +1,3 @@
-"""
-Unified OCR Service
-Combines document detection, preprocessing, and OCR extraction into a single pipeline.
-"""
-
 import cv2
 import numpy as np
 from typing import Optional, Dict, Any, List, Tuple
@@ -18,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class OCRResult:
-    """Represents a single OCR attempt result"""
-    
+
     def __init__(
         self,
         text: str,
@@ -42,11 +36,9 @@ class OCRResult:
     
     @property
     def score(self) -> float:
-        """Combined score for ranking results"""
         if self.error or not self.text:
             return 0.0
         
-        # Weight: confidence (60%) + text quality (40%)
         text_quality = min(len([c for c in self.text if c.isalnum()]) / 100, 1.0)
         return (0.6 * self.confidence) + (0.4 * text_quality)
     
@@ -63,14 +55,6 @@ class OCRResult:
 
 
 class UnifiedOCRService:
-    """
-    End-to-end OCR service with:
-    - Automatic document detection and cropping
-    - Multi-pass preprocessing strategies
-    - Smart OCR provider selection
-    - Result ranking and selection
-    - Structured data extraction
-    """
 
     def __init__(
         self,
@@ -112,19 +96,7 @@ class UnifiedOCRService:
         multi_pass: bool = True,
         return_structured: bool = False
     ) -> Dict[str, Any]:
-        """
-        Full OCR pipeline: detect → crop → preprocess → OCR → extract.
-        
-        Args:
-            image: Input image (RGB/BGR)
-            lang: Language code ("en", "km")
-            auto_crop: Auto-detect and crop document
-            multi_pass: Try multiple preprocessing strategies
-            return_structured: Return structured data (words, lines, blocks)
-        
-        Returns:
-            Dict with extracted data, best OCR result, and metadata
-        """
+
         start_time = time.time()
         metadata = {
             "pipeline_stages": {},
@@ -170,7 +142,7 @@ class UnifiedOCRService:
                 detection=metadata["pipeline_stages"].get("detection")
             )
 
-        # Stage 4: Extract structured data
+        # Extract structured data
         extracted_data = self.extractor.extract(best_result.text)
         
         metadata["pipeline_stages"]["extraction"] = {
@@ -179,7 +151,7 @@ class UnifiedOCRService:
             "total_amount": extracted_data.get("payment", {}).get("total") if extracted_data.get("payment") else None
         }
 
-        # Stage 5: Save best processed image
+        # Save best processed image
         processed_image_path = self._save_processed_image(best_result.image)
 
         metadata["pipeline_stages"]["total_latency"] = round(time.time() - start_time, 3)
@@ -242,32 +214,32 @@ class UnifiedOCRService:
         strategies = []
         h, w = image.shape[:2]
 
-        # Strategy 1: Light enhancement (fast, good for clear images)
+        # Light enhancement (fast, good for clear images)
         strategies.append((
             "light_en",
             {"for_nextocr": True, "lang": "en", "auto_crop": False}
         ))
 
-        # Strategy 2: Khmer-optimized (for Khmer text)
+        # Khmer-optimized (for Khmer text)
         if lang == "km":
             strategies.append((
                 "khmer_enhanced",
                 {"for_nextocr": True, "lang": "km", "auto_crop": False}
             ))
 
-        # Strategy 3: Heavy enhancement (for low quality)
+        # Heavy enhancement (for low quality)
         strategies.append((
             "heavy_enhanced",
             {"for_nextocr": True, "lang": lang, "auto_crop": False}
         ))
 
-        # Strategy 4: No enhancement (original)
+        # No enhancement (original)
         strategies.append((
             "original",
             {"for_nextocr": False, "lang": lang, "auto_crop": False}
         ))
 
-        # Strategy 5: Super-resolution for small images
+        # Super-resolution for small images
         if w < 1000:
             strategies.append((
                 "superres",

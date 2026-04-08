@@ -58,3 +58,28 @@ class PreprocessResponse(BaseModel):
     invoice_data: Optional[InvoiceData] = None
     processing_info: dict
     message: str = ""
+
+
+class YOLODetectionInfo(BaseModel):
+    """YOLO-specific detection metadata"""
+    detection_method: str = "yolo"
+    confidence: float = 0.0
+    bounding_box: Dict[str, float]
+    num_boxes_detected: int = 0
+    merged_boxes: bool = False
+    image_width: int
+    image_height: int
+    quality_metrics: Optional[Dict[str, Any]] = None
+
+
+class YOLOPreprocessResponse(BaseModel):
+    """Response schema for YOLO + NextOCR endpoint"""
+    success: bool
+    invoice_data: Optional[InvoiceData] = None
+    detection_info: YOLODetectionInfo
+    ocr_confidence: float = 0.0
+    processing_time_ms: float = 0.0
+    processed_image_url: Optional[str] = None
+    visualization_url: Optional[str] = None
+    message: str = ""
+    metadata: Optional[Dict[str, Any]] = None

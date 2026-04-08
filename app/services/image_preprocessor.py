@@ -1,5 +1,3 @@
-# app/preprocessing/image_preprocessor.py
-
 import cv2
 import numpy as np
 import os

@@ -12,15 +12,8 @@ import json
 from collections import OrderedDict
 
 
+# Final Configurations for OCR Client
 class OCRClient:
-    """
-    Production-grade OCR client with:
-    - Smart routing + confidence scoring
-    - Result caching
-    - Retry logic with exponential backoff
-    - Structured text extraction (words, lines, blocks)
-    - Multi-provider support
-    """
 
     def __init__(
         self,
@@ -55,18 +48,6 @@ class OCRClient:
         lang: str = "en",
         use_cache: bool = True
     ) -> Dict[str, Any]:
-        """
-        Extract text from image with smart routing.
-        
-        Args:
-            image: Input image (numpy array)
-            method: "auto", "nextocr", or "ocrspace"
-            lang: Language code ("en", "km")
-            use_cache: Use cached results if available
-        
-        Returns:
-            Dict with text, confidence, provider, latency, and structured data
-        """
         start_time = time.time()
 
         # Check cache
