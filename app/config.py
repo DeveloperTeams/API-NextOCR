@@ -1,7 +1,42 @@
 import os
+from glob import glob
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _resolve_model_path(raw_path: str) -> str:
+    """Resolve a model path from env var, supporting both absolute and repo-relative paths."""
+    if not raw_path:
+        return ""
+
+    candidate = Path(raw_path).expanduser()
+    if candidate.exists():
+        return str(candidate)
+
+    if not candidate.is_absolute():
+        app_dir = Path(__file__).resolve().parent
+        rel_candidate = app_dir / candidate
+        if rel_candidate.exists():
+            return str(rel_candidate)
+
+    return ""
+
+
+def _find_default_yolo_model() -> str:
+    """Find DocLayout YOLO weights inside app/models snapshots."""
+    app_dir = Path(__file__).resolve().parent
+    pattern = (
+        app_dir
+        / "models"
+        / "models--juliozhao--DocLayout-YOLO-DocStructBench"
+        / "snapshots"
+        / "*"
+        / "doclayout_yolo_docstructbench_imgsz1024.pt"
+    )
+    matches = sorted(glob(str(pattern)))
+    return matches[0] if matches else ""
 
 class Config:
     HOST = os.getenv("HOST", "0.0.0.0")
@@ -14,4 +49,5 @@ class Config:
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
     ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
     HF_HUB_TOKEN = os.getenv("HF_HUB_TOKEN", "")
-    YOLO_MODEL = os.getenv("YOLO_MODEL", "") or r"d:/Project/backend/api/app/models/models--juliozhao--DocLayout-YOLO-DocStructBench/snapshots/8c3299a30b8ff29a1503c4431b035b93220f7b11/doclayout_yolo_docstructbench_imgsz1024.pt"
+    HF_TOKEN = os.getenv("HF_TOKEN", "") or HF_HUB_TOKEN
+    YOLO_MODEL = _resolve_model_path(os.getenv("YOLO_MODEL", "")) or _find_default_yolo_model()

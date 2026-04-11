@@ -3,6 +3,7 @@ import numpy as np
 from typing import Tuple, List, Optional, Dict, Any
 import os
 import logging
+from app.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +26,9 @@ class YOLOInvoiceDetector:
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         self.yolo_model = None
-        
-        # Use provided path or default to local model
-        if model_path is None:
-            default_path = r"d:/Project/backend/api/app/models/models--juliozhao--DocLayout-YOLO-DocStructBench/snapshots/8c3299a30b8ff29a1503c4431b035b93220f7b11/doclayout_yolo_docstructbench_imgsz1024.pt"
-            if os.path.exists(default_path):
-                model_path = default_path
+
+        # Use explicit model path first, then portable app config path.
+        model_path = model_path or Config.YOLO_MODEL
         
         self._load_model(model_path)
 
@@ -38,11 +36,15 @@ class YOLOInvoiceDetector:
         """Load YOLO model for invoice detection"""
         try:
             from doclayout_yolo import YOLOv10
-            
+
             if model_path and os.path.exists(model_path):
                 self.yolo_model = YOLOv10(model_path)
                 logger.info(f"YOLO model loaded from local path: {model_path}")
                 return
+
+            # Keep compatibility with HF client which expects HF_TOKEN.
+            if Config.HF_TOKEN:
+                os.environ.setdefault("HF_TOKEN", Config.HF_TOKEN)
 
             path = "juliozhao/DocLayout-YOLO-DocStructBench"
             self.yolo_model = YOLOv10.from_pretrained(path)
