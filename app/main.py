@@ -9,12 +9,14 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from typing import List, Tuple, Optional
+from app.utils.validation import summarize_corrections, validate_and_sanitize_invoice_data
 from .config import Config
-from app.models.schemas import DetectionMethod, HealthResponse, PreprocessResponse, YOLOPreprocessResponse
+from app.models.schemas import DetectionMethod, HealthResponse, PreprocessResponse, ProcessingInfo, YOLOPreprocessResponse
 from app.services.document_detector import DocumentDetector
 from app.services.image_preprocessor import ImagePreprocessor
 from app.services.ocr_client import OCRClient
 from app.services.data_extractor import DataExtractor
+from app.services.llm_helper import LLMHelper
 from app.services.yolo_invoice_detector import YOLOInvoiceDetector
 from app.services.yolo_preprocessor import YOLOInvoicePreprocessor
 from app.utils.helpers import get_safe_original_filename, ensure_dir_exists
@@ -48,6 +50,15 @@ ocr_client = OCRClient(
     nextocr_secret_key=Config.NEXTOCR_SECRET_KEY,
 )
 data_extractor = DataExtractor()
+llm_helper = LLMHelper(
+    api_key=Config.QWEN_API_KEY,
+    model=Config.QWEN_MODEL,
+    base_url=Config.QWEN_BASE_URL,
+    timeout_seconds=Config.QWEN_TIMEOUT_SECONDS,
+    enable_debug=Config.QWEN_ENABLE_DEBUG,
+)
+
+logger.info(f"Initialized LLMHelper with model: {Config.QWEN_MODEL}, API key configured: {llm_helper.enabled}")
 
 # YOLO-specific services
 yolo_detector = YOLOInvoiceDetector(model_path=Config.YOLO_MODEL)
@@ -75,9 +86,6 @@ def _to_detection_method(method: str) -> DetectionMethod:
     return DetectionMethod.FALLBACK
 
 
-# -------------------------------
-# Health check endpoint
-# -------------------------------
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
@@ -105,17 +113,14 @@ async def preprocess_invoice(file: UploadFile = File(...)):
     3. Apply adaptive preprocessing optimized for NextOCR
     4. Run NextOCR on the processed image
     5. Extract structured invoice data from OCR text
-    6. Return structured invoice data and processing metadata
-
-    Input: Raw invoice image (JPEG/PNG)
-    Output: Structured invoice data from NextOCR with bounding box for ML consumption
+    6. Enhance with LLM correction
+    7. Validate and sanitize output
+    8. Return structured invoice data and processing metadata
     """
     try:
-        # Read and convert image
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
         image_array = np.array(image.convert("RGB"))
-
         logger.info(f"Processing image: {image_array.shape}")
 
         if detector.segmenter is None:
@@ -166,21 +171,19 @@ async def preprocess_invoice(file: UploadFile = File(...)):
             cropped_image.copy(),
             for_nextocr=True,
             lang="en",
-            auto_crop=False,  
-            use_segmenter=False,  
+            auto_crop=False,
+            use_segmenter=False,
         )
 
-        # Get original client filename safely
         filename = get_safe_original_filename(file.filename)
         filepath = os.path.join(UPLOAD_DIR, filename)
-
-        # Convert RGB to BGR for OpenCV saving
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        
         if len(processed_image.shape) == 3:
             cv2.imwrite(filepath, cv2.cvtColor(processed_image, cv2.COLOR_RGB2BGR))
         else:
             cv2.imwrite(filepath, processed_image)
 
-        # Run NextOCR on the processed image
         ocr_result = ocr_client.extract(processed_image, method="nextocr", lang="en")
 
         if ocr_result.get("error"):
@@ -206,23 +209,58 @@ async def preprocess_invoice(file: UploadFile = File(...)):
 
         logger.info(f"NextOCR successful. Extracted {len(extracted_text)} characters")
 
-        # Extract structured data from OCR text
         invoice_data = data_extractor.extract(extracted_text)
+        invoice_dict = invoice_data.model_dump() if hasattr(invoice_data, 'model_dump') else invoice_data
+
+        llm_result = llm_helper.enhance_invoice_data(
+            raw_text=extracted_text,
+            invoice_data=invoice_dict,
+        )
+
+        if llm_result.get("debug") and logger.isEnabledFor(logging.DEBUG):
+            logger.debug("LLM corrections: %s", llm_result["debug"])
+
+        final_invoice_data = validate_and_sanitize_invoice_data(
+            raw_llm_output=llm_result["invoice_data"],
+            fallback_data=invoice_dict,
+        )
+
+        if final_invoice_data.dynamic_fields and logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Remaining dynamic_fields: %s", list(final_invoice_data.dynamic_fields.keys()))
+        
+
+        if Config.DEBUG_MODE:
+            corrections = summarize_corrections(invoice_dict, final_invoice_data)
+            if corrections["fields_changed"] > 0:
+                logger.info(f"LLM made {corrections['fields_changed']} corrections: {list(corrections['changes'].keys())}")
+
         bbox = _corners_to_bbox(corners)
-        processing_info = {
-            "detection_method": method,
-            "bounding_box": bbox,
-            "confidence": (segmenter_metadata or {}).get("confidence", ocr_result.get("confidence", 0.0)),
-            "provider": ocr_result.get("provider", "nextocr"),
-            "latency": ocr_result.get("latency", 0.0),
-            "cropped_image_url": f"/api/uploads/{filename}",
-            "image_width": processed_image.shape[1],
-            "image_height": processed_image.shape[0],
+        
+        llm_meta = {
+            "enabled": llm_helper.enabled,
+            "applied": llm_result["applied"],
+            "error": llm_result.get("error"),
+            "model": Config.QWEN_MODEL,
+            "validation_passed": True,  
         }
+        if Config.DEBUG_MODE and llm_result.get("debug"):
+            llm_meta["debug_summary"] = llm_result["debug"].get("corrections_summary")
+
+        processing_info = ProcessingInfo(
+            detection_method=method,
+            bounding_box=bbox,
+            confidence=(segmenter_metadata or {}).get("confidence", ocr_result.get("confidence", 0.0)),
+            provider=ocr_result.get("provider", "nextocr"),
+            latency=ocr_result.get("latency", 0.0),
+            cropped_image_url=f"/api/uploads/{filename}",
+            image_width=processed_image.shape[1],
+            image_height=processed_image.shape[0],
+            llm_enhancement=llm_meta,
+        )
 
         return PreprocessResponse(
             success=True,
-            invoice_data=invoice_data,
+            invoice_data=final_invoice_data,
             processing_info=processing_info,
             message=f"Invoice preprocessed and processed with NextOCR using {method} detection",
         )
@@ -231,8 +269,14 @@ async def preprocess_invoice(file: UploadFile = File(...)):
         raise
     except Exception as e:
         logger.error(f"Preprocessing failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Preprocessing failed: {str(e)}")
-
+        raise HTTPException(
+            status_code=500, 
+            detail={
+                "message": "Preprocessing failed",
+                "error": str(e),
+                "type": type(e).__name__
+            }
+        )
 
 # NextOCR + YOLO-specific invoice preprocessing endpoint
 @app.post("/api/preprocess-yolo", response_model=YOLOPreprocessResponse)
@@ -322,6 +366,11 @@ async def preprocess_invoice_yolo(file: UploadFile = File(...)):
 
         # Extract structured data from OCR text
         invoice_data = data_extractor.extract(extracted_text)
+        llm_result = llm_helper.enhance_invoice_data(
+            raw_text=extracted_text,
+            invoice_data=invoice_data.model_dump(),
+        )
+        final_invoice_data = llm_result["invoice_data"]
         processing_time_ms = (time.time() - start_time) * 1000
         bbox = _corners_to_bbox(corners)
 
@@ -355,7 +404,7 @@ async def preprocess_invoice_yolo(file: UploadFile = File(...)):
 
         return YOLOPreprocessResponse(
             success=True,
-            invoice_data=invoice_data,
+            invoice_data=final_invoice_data,
             detection_info=detection_info,
             ocr_confidence=float(ocr_result.get("confidence", 0.0)),
             processing_time_ms=float(processing_time_ms),
@@ -365,6 +414,12 @@ async def preprocess_invoice_yolo(file: UploadFile = File(...)):
             metadata=clean_numpy({
                 "preprocessing": {k: v for k, v in preprocess_metadata.items() if k != "steps_applied"},
                 "detection": {k: v for k, v in detection_metadata.items() if k not in ["mask"]},
+                "llm_enhancement": {
+                    "enabled": llm_helper.enabled,
+                    "applied": llm_result["applied"],
+                    "error": llm_result.get("error"),
+                    "model": Config.QWEN_MODEL,
+                },
             })
         )
 

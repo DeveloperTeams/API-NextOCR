@@ -157,6 +157,12 @@ NEXTOCR_ENDPOINT=https://developer.nextocr.org/ocr_api
 NEXTOCR_USERNAME=
 NEXTOCR_SECRET_KEY=
 
+# Qwen post-processing (optional, typo correction + field normalization)
+QWEN_API_KEY=
+QWEN_MODEL=qwen-plus
+QWEN_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+QWEN_TIMEOUT_SECONDS=20
+
 # Optional
 MAX_FILE_SIZE=10485760
 UPLOAD_FOLDER=uploads
@@ -208,6 +214,7 @@ Key settings:
 - HOST: API bind address
 - PORT: API port
 - NEXTOCR_ENDPOINT, NEXTOCR_USERNAME, NEXTOCR_SECRET_KEY: NextOCR credentials
+- QWEN_API_KEY, QWEN_MODEL, QWEN_BASE_URL: Qwen LLM post-processing configuration
 - OCR_SPACE_API_KEY: OCR.space key
 - UPLOAD_FOLDER: directory mounted at /api/uploads
 - YOLO_MODEL: optional local model path, otherwise pretrained path is used

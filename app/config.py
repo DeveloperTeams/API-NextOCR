@@ -45,6 +45,12 @@ class Config:
     NEXTOCR_ENDPOINT = os.getenv("NEXTOCR_ENDPOINT", "https://developer.nextocr.org/ocr_api")
     NEXTOCR_USERNAME = os.getenv("NEXTOCR_USERNAME", "")
     NEXTOCR_SECRET_KEY = os.getenv("NEXTOCR_SECRET_KEY", "")
+    QWEN_API_KEY = os.getenv("QWEN_API_KEY", "")
+    QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-plus")
+    QWEN_BASE_URL = os.getenv("QWEN_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
+    QWEN_TIMEOUT_SECONDS = int(os.getenv("QWEN_TIMEOUT_SECONDS", 20))
+    DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+    QWEN_ENABLE_DEBUG = os.getenv("QWEN_ENABLE_DEBUG", "false").lower() == "true"
     MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10485760))  # 10MB default
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
     ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
