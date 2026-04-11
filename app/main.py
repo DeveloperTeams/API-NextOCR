@@ -227,23 +227,22 @@ async def preprocess_invoice(file: UploadFile = File(...)):
 
         if final_invoice_data.dynamic_fields and logger.isEnabledFor(logging.DEBUG):
             logger.debug("Remaining dynamic_fields: %s", list(final_invoice_data.dynamic_fields.keys()))
-        
 
-        if Config.DEBUG_MODE:
+        if Config.DEBUG:
             corrections = summarize_corrections(invoice_dict, final_invoice_data)
             if corrections["fields_changed"] > 0:
                 logger.info(f"LLM made {corrections['fields_changed']} corrections: {list(corrections['changes'].keys())}")
 
         bbox = _corners_to_bbox(corners)
-        
+
         llm_meta = {
             "enabled": llm_helper.enabled,
             "applied": llm_result["applied"],
             "error": llm_result.get("error"),
             "model": Config.QWEN_MODEL,
-            "validation_passed": True,  
+            "validation_passed": True,
         }
-        if Config.DEBUG_MODE and llm_result.get("debug"):
+        if Config.DEBUG and llm_result.get("debug"):
             llm_meta["debug_summary"] = llm_result["debug"].get("corrections_summary")
 
         processing_info = ProcessingInfo(
