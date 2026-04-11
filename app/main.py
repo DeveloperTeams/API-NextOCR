@@ -100,8 +100,8 @@ async def health_check():
 async def preprocess_invoice(file: UploadFile = File(...)):
     """
     Single endpoint for invoice preprocessing pipeline with NextOCR:
-    1. Detect invoice using YOLOv10 (primary) with fallback to U2-Net/OpenCV
-    2. Crop invoice tightly around document boundaries
+    1. Detect invoice using U2-Net
+    2. Auto-crop invoice using perspective transform
     3. Apply adaptive preprocessing optimized for NextOCR
     4. Run NextOCR on the processed image
     5. Extract structured invoice data from OCR text
@@ -118,13 +118,49 @@ async def preprocess_invoice(file: UploadFile = File(...)):
 
         logger.info(f"Processing image: {image_array.shape}")
 
-        corners, method = detector.detect(image_array)
+        if detector.segmenter is None:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "message": "U-Net segmenter is unavailable",
+                    "error": "U-Net model/session could not be initialized",
+                },
+            )
+
+        method = "unet"
+        corners, status, segmenter_metadata = detector.segmenter.detect(
+            image_array,
+            return_mask=False,
+            adaptive_threshold=True,
+            refine_edges=True,
+        )
+
         if corners is None:
-            h, w = image_array.shape[:2]
-            corners = [(0, 0), (w, 0), (w, h), (0, h)]
-            method = "fallback"
-            logger.warning("No document detected, using full image")
-        cropped_image = detector.crop_and_transform(image_array, corners)
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "U-Net could not detect invoice boundaries",
+                    "error": status,
+                },
+            )
+
+        cropped_image, crop_meta = detector.segmenter.crop_document(
+            image_array,
+            corners=corners,
+            return_metadata=True,
+        )
+
+        if cropped_image is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "U-Net auto-crop failed",
+                    "error": "crop_failed",
+                },
+            )
+
+        if crop_meta:
+            segmenter_metadata = {**(segmenter_metadata or {}), **crop_meta}
 
         processed_image, _ = preprocessor.preprocess_adaptive(
             cropped_image.copy(),
@@ -176,7 +212,7 @@ async def preprocess_invoice(file: UploadFile = File(...)):
         processing_info = {
             "detection_method": method,
             "bounding_box": bbox,
-            "confidence": ocr_result.get("confidence", 0.0),
+            "confidence": (segmenter_metadata or {}).get("confidence", ocr_result.get("confidence", 0.0)),
             "provider": ocr_result.get("provider", "nextocr"),
             "latency": ocr_result.get("latency", 0.0),
             "cropped_image_url": f"/api/uploads/{filename}",

@@ -3,6 +3,7 @@ import numpy as np
 from typing import Tuple, List, Optional
 import os
 import logging
+from app.config import Config
 from app.services.document_segmenter import DocumentSegmenter
 
 logger = logging.getLogger(__name__)
@@ -25,21 +26,21 @@ class DocumentDetector:
         """Load YOLO model if available"""
         try:
             from doclayout_yolo import YOLOv10
+
+            # Use either explicit path or resolved app config path.
+            candidate_path = model_path or Config.YOLO_MODEL
+            if candidate_path and os.path.exists(candidate_path):
+                self.yolo_model = YOLOv10(candidate_path)
+                logger.info(f"YOLOv10 model loaded from local path: {candidate_path}")
+                return
+
+            # Keep compatibility with HF client which expects HF_TOKEN.
+            if Config.HF_TOKEN:
+                os.environ.setdefault("HF_TOKEN", Config.HF_TOKEN)
             
-            # Use provided path or default to local model
-            if model_path and os.path.exists(model_path):
-                self.yolo_model = YOLOv10(model_path)
-                logger.info(f"YOLOv10 model loaded from: {model_path}")
-            else:
-                # Try default local model path
-                default_path = r"d:/Project/backend/api/app/models/models--juliozhao--DocLayout-YOLO-DocStructBench/snapshots/8c3299a30b8ff29a1503c4431b035b93220f7b11/doclayout_yolo_docstructbench_imgsz1024.pt"
-                if os.path.exists(default_path):
-                    self.yolo_model = YOLOv10(default_path)
-                    logger.info(f"YOLOv10 model loaded from default local path")
-                else:
-                    # Fallback to HuggingFace
-                    self.yolo_model = YOLOv10.from_pretrained("juliozhao/DocLayout-YOLO-DocStructBench")
-                    logger.info(f"YOLOv10 model loaded from HuggingFace")
+            # Fallback to HuggingFace when local model is unavailable.
+            self.yolo_model = YOLOv10.from_pretrained("juliozhao/DocLayout-YOLO-DocStructBench")
+            logger.info("YOLOv10 model loaded from HuggingFace")
         except Exception as e:
             logger.warning(f"YOLOv10 not available: {e}. Install missing deps such as 'huggingface_hub'.")
             self.yolo_model = None
