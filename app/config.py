@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
+# Model path configuration logic:
 def _resolve_model_path(raw_path: str) -> str:
     """Resolve a model path from env var, supporting both absolute and repo-relative paths."""
     if not raw_path:
@@ -23,7 +23,7 @@ def _resolve_model_path(raw_path: str) -> str:
 
     return ""
 
-
+# Private function to find the default YOLO model in the app/models directory
 def _find_default_yolo_model() -> str:
     """Find DocLayout YOLO weights inside app/models snapshots."""
     app_dir = Path(__file__).resolve().parent
