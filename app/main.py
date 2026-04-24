@@ -53,7 +53,7 @@ ensure_dir_exists(UPLOAD_DIR)
 detector = DocumentDetector(
     yolo_model_path=Config.YOLO_MODEL, unet_model_path=Config.UNET_MODEL
 )
-preprocessor = ImagePreprocessor()
+preprocessor = ImagePreprocessor(unet_model_path=Config.UNET_MODEL)
 ocr_client = OCRClient(
     ocr_space_key=Config.OCR_SPACE_API_KEY,
     nextocr_endpoint=Config.NEXTOCR_ENDPOINT,

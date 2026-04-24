@@ -26,14 +26,18 @@ class ImagePreprocessor:
         "skew_max": 2.0,
     }
 
-    def __init__(self, use_segmenter: bool = True):
+    def __init__(
+        self,
+        use_segmenter: bool = True,
+        unet_model_path: Optional[str] = None,
+    ):
         self._superres = None
         self._superres_loaded = False
         self._segmenter: Optional[DocumentSegmenter] = None
 
         if use_segmenter:
             try:
-                self._segmenter = DocumentSegmenter()
+                self._segmenter = DocumentSegmenter(model_path=unet_model_path)
             except Exception as e:
                 logger.warning(f"Failed to initialize DocumentSegmenter: {e}")
 
