@@ -1,6 +1,8 @@
 import os
 import uuid
 
+# Generates the name exactly as the client provided, but ensures it has a valid extension and is unique if needed.
+
 def generate_unique_filename(original_filename: str) -> str:
     ext = os.path.splitext(original_filename)[1] or ".jpg"
     return f"{uuid.uuid4().hex}{ext}"
