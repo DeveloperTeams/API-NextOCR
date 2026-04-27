@@ -25,7 +25,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/nextocr-api
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/api-invoice
           tags: |
             type=ref,event=tag
             type=semver,pattern={{version}}
