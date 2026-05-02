@@ -8,8 +8,8 @@ pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 python-multipart>=0.0.6
 requests>=2.31.0
-torch>=2.0.1
-torchvision>=0.15.2
+torch==2.0.1+cpu --index-url https://download.pytorch.org/whl/cpu
+torchvision==0.15.2+cpu --index-url https://download.pytorch.org/whl/cpu
 ultralytics>=8.0.200
 uvicorn[standard]>=0.24.0
 doclayout-yolo==0.0.4

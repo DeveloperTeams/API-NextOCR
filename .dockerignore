@@ -23,3 +23,8 @@ dist/
 htmlcov/
 .mypy_cache/
 .hypothesis/
+app/models/unet_model/*.onnx
+app/models/yolo_model/*.pt
+app/models/yolo_model/.cache/
+.git/
+.gitignore
