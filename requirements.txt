@@ -1,13 +1,11 @@
 aiofiles>=23.2.1
-python-dotenv>=1.0.0
 fastapi>=0.104.1
 numpy==1.26.4
-opencv-python>=4.9.0.80
-opencv-python-headless>=4.9.0.80
 opencv-contrib-python-headless>=4.9.0.80
 pillow>=10.1.0
 pydantic>=2.7.0
 pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
 python-multipart>=0.0.6
 requests>=2.31.0
 torch>=2.0.1

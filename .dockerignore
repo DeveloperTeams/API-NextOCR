@@ -10,3 +10,16 @@ __pycache__/
 uploads/
 .vscode/
 .ruff_cache/
+.pytest_cache/
+node_modules/
+*.egg-info/
+build/
+dist/
+.DS_Store
+*.swp
+*.swo
+*~
+.coverage
+htmlcov/
+.mypy_cache/
+.hypothesis/
