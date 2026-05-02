@@ -1,9 +1,10 @@
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    PATH="/root/.cargo/bin:$PATH"
 
 WORKDIR /app
 
@@ -11,15 +12,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:$PATH"
 
 COPY pyproject.toml uv.lock ./
 
-RUN uv venv && \
-    uv sync --frozen --no-dev --no-editable
+# Install dependencies in venv
+RUN /root/.cargo/bin/uv venv && \
+    /root/.cargo/bin/uv sync --frozen --no-dev --no-editable
 
-FROM python:3.11-slim
+FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
