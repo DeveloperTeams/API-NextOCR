@@ -128,6 +128,7 @@ class LLMHelper:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
+                # Change this proxy via nginx in production to avoid CORS issues and hide API key
                 "HTTP-Referer": "http://localhost:8000",  # Update in production
                 "X-Title": "E-Invoice Engine",
             }

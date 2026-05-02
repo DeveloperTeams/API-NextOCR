@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock ./
