@@ -6,11 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "aiofiles>=23.2.1",
-    "dotenv>=0.9.9",
     "fastapi>=0.104.1",
     "numpy==1.26.4",
-    "opencv-python>=4.9.0.80",
-    "opencv-python-headless>=4.9.0.80",
     "opencv-contrib-python-headless>=4.9.0.80",
     "pillow>=10.1.0",
     "pydantic>=2.7.0",
@@ -25,6 +22,5 @@ dependencies = [
     "doclayout-yolo==0.0.4",
     "nextocr-python>=0.1.1",
     "onnxruntime>=1.24.4",
-    "onnxruntime-gpu>=1.24.4",
     "huggingface-hub>=1.8.0",
 ]
