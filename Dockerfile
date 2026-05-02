@@ -3,23 +3,22 @@ FROM python:3.11-slim AS builder
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    PATH="/root/.cargo/bin:$PATH"
+    UV_LINK_MODE=copy
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+# Install uv via pip
+RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock ./
 
 # Install dependencies in venv
-RUN /root/.cargo/bin/uv venv && \
-    /root/.cargo/bin/uv sync --frozen --no-dev --no-editable
+RUN uv venv && \
+    uv sync --frozen --no-dev --no-editable
 
 FROM python:3.11-slim AS runtime
 
